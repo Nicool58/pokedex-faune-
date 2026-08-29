@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokédex Faune Familial</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f6f8; margin: 0; padding: 15px; color: #333; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    h1, h2 { margin-top: 0; color: #2c3e50; }
+    .status-bar { display: flex; justify-content: space-between; align-items: center; background: #eef2f5; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+    .xp-bar { background: #ddd; height: 10px; border-radius: 5px; margin-top: 8px; overflow: hidden; }
+    .xp-fill { background: #4CAF50; height: 100%; width: 0%; transition: width 0.3s; }
+    label { display: block; margin-top: 10px; font-size: 14px; font-weight: bold; }
+    input, select, button { width: 100%; padding: 12px; margin-top: 5px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
+    button { background: #27ae60; color: white; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
+    .animal-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.08); text-align: center; padding-bottom: 10px; }
+    .animal-card img { width: 100%; height: 110px; object-fit: cover; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; color: white; font-weight: bold; }
+    .Commun { background: #95a5a6; }
+    .Peu-commun { background: #3498db; }
+    .Rare { background: #9b59b6; }
+    .Tres-rare { background: #e67e22; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>🦅 Pokédex Faune</h1>
+    <div class="status-bar">
+      <span>Niveau <span id="level">1</span> (<span id="title">Débutant</span>)</span>
+      <span><span id="xp">0</span> XP</span>
+    </div>
+    <div class="xp-bar"><div class="xp-fill" id="xp-fill"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>📸 Capturer un animal</h2>
+    <form id="capture-form">
+      <label for="photo">Photo de l'animal</label>
+      <input type="file" id="photo" accept="image/*" capture="environment" required>
+
+      <label for="name">Nom de l'animal</label>
+      <input type="text" id="name" placeholder="ex: Écureuil roux" required>
+
+      <label for="rarity">Rareté de l'espèce</label>
+      <select id="rarity">
+        <option value="50">Commun (50 XP)</option>
+        <option value="150">Peu commun (150 XP)</option>
+        <option value="350">Rare (350 XP)</option>
+        <option value="700">Très rare (700 XP)</option>
+      </select>
+
+      <button type="submit">Ajouter au Pokédex</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>📖 Votre Collection</h2>
+    <div class="grid" id="collection"></div>
+  </div>
+
+  <script>
+    const levels = [
+      { xp: 0, level: 1, title: 'Débutant' },
+      { xp: 150, level: 2, title: 'Observateur' },
+      { xp: 500, level: 3, title: 'Explorateur' },
+      { xp: 1200, level: 4, title: 'Naturaliste' },
+      { xp: 2500, level: 5, title: 'Pisteur' },
+      { xp: 4500, level: 6, title: 'Expert Faune' },
+      { xp: 7500, level: 7, title: 'Maître Nature' },
+      { xp: 12000, level: 8, title: 'Légende' }
+    ];
+
+    let state = JSON.parse(localStorage.getItem('pokedex')) || { xp: 0, animals: [] };
+
+    function updateUI() {
+      let currentLevel = levels[0];
+      let nextLevel = levels[1];
+
+      for (let i = levels.length - 1; i >= 0; i--) {
+        if (state.xp >= levels[i].xp) {
+          currentLevel = levels[i];
+          nextLevel = levels[i + 1] || levels[i];
+          break;
+        }
+      }
+
+      document.getElementById('xp').textContent = state.xp;
+      document.getElementById('level').textContent = currentLevel.level;
+      document.getElementById('title').textContent = currentLevel.title;
+
+      let progress = 100;
+      if (nextLevel !== currentLevel) {
+        let xpInLevel = state.xp - currentLevel.xp;
+        let levelRange = nextLevel.xp - currentLevel.xp;
+        progress = Math.min((xpInLevel / levelRange) * 100, 100);
+      }
+      document.getElementById('xp-fill').style.width = progress + '%';
+
+      const container = document.getElementById('collection');
+      container.innerHTML = '';
+      state.animals.forEach(item => {
+        const rarityClass = item.rarityText.replace(' ', '-');
+        container.innerHTML += `
+          <div class="animal-card">
+            <img src="${item.img}" alt="${item.name}">
+            <h4 style="margin: 5px 0 2px 0;">${item.name}</h4>
+            <span class="badge ${rarityClass}">${item.rarityText}</span>
+          </div>
+        `;
+      });
+
+      localStorage.setItem('pokedex', JSON.stringify(state));
+    }
+
+    document.getElementById('capture-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('photo');
+      const nameInput = document.getElementById('name');
+      const raritySelect = document.getElementById('rarity');
+
+      const xpGained = parseInt(raritySelect.value);
+      const rarityText = raritySelect.options[raritySelect.selectedIndex].text.split(' ')[0];
+      const isFirstDiscovery = !state.animals.some(a => a.name.toLowerCase() === nameInput.value.trim().toLowerCase());
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        state.xp += xpGained + (isFirstDiscovery ? 50 : 0);
+        state.animals.unshift({
+          name: nameInput.value.trim(),
+          img: evt.target.result,
+          rarityText: rarityText
+        });
+        updateUI();
+        document.getElementById('capture-form').reset();
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    });
+
+    updateUI();
+  </script>
+</body>
+</html>
