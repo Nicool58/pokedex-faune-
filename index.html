@@ -16,23 +16,21 @@
     button { background: #27ae60; color: white; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; transition: background 0.3s; }
     button:disabled { background: #95a5a6; cursor: not-allowed; }
     button.analyze-btn { background: #3498db; }
-    button.analyze-btn:hover { background: #2980b9; }
     
     #preview { max-width: 100%; height: auto; display: none; border-radius: 8px; margin-top: 10px; }
     #identification-results { display: none; margin-top: 15px; background: #eef2f5; padding: 15px; border-radius: 8px; }
     #suggestion-list { margin-top: 10px; }
-    .suggestion-item { background: white; padding: 10px; border-radius: 6px; margin-bottom: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
-    .suggestion-item:hover { background: #f0f0f0; border-color: #3498db; }
-    .suggestion-item.selected { border-color: #27ae60; background: #e8f8f0; }
+    .suggestion-item { background: white; padding: 10px; border-radius: 6px; margin-bottom: 8px; cursor: pointer; border: 2px solid #e0e0e0; transition: all 0.2s; }
+    .suggestion-item:active { border-color: #27ae60; background: #e8f8f0; }
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
     .animal-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.08); text-align: center; padding-bottom: 10px; }
     .animal-card img { width: 100%; height: 110px; object-fit: cover; }
     .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; color: white; font-weight: bold; margin-top: 5px; }
-    .Common { background: #95a5a6; } /* Commun */
-    .Uncommon { background: #3498db; } /* Peu commun */
-    .Rare { background: #9b59b6; } /* Rare */
-    .Very-rare { background: #e67e22; } /* Très rare */
+    .Commun { background: #95a5a6; }
+    .Peu-commun { background: #3498db; }
+    .Rare { background: #9b59b6; }
+    .Très-rare { background: #e67e22; }
   </style>
 </head>
 <body>
@@ -54,20 +52,24 @@
 
     <div id="identification-results">
       <h3>IA : Quelles espèces ?</h3>
-      <p style="font-size:13px; color:#666;">Cliquez sur la meilleure suggestion :</p>
+      <p style="font-size:13px; color:#666;">Cliquez sur l'animal identifié :</p>
       <div id="suggestion-list"></div>
-      <p id="loading-ia" style="display:none; text-align:center;">🔍 Recherche...</p>
+      <p id="loading-ia" style="display:none; text-align:center;">🔍 Recherche de l'animal...</p>
     </div>
 
     <form id="capture-form" style="display:none; border-top: 1px solid #eee; margin-top: 20px;">
-      <label for="name">Nom de l'animal</label>
+      <label for="name">Nom retenu</label>
       <input type="text" id="name" required>
 
-      <label for="rarity">Rareté de l'espèce (déterminée par l'IA)</label>
-      <input type="hidden" id="rarity-value">
-      <input type="text" id="rarity-display" disabled>
+      <label for="rarity">Rareté de l'espèce</label>
+      <select id="rarity">
+        <option value="50">Commun (50 XP)</option>
+        <option value="150">Peu commun (150 XP)</option>
+        <option value="350">Rare (350 XP)</option>
+        <option value="700">Très rare (700 XP)</option>
+      </select>
 
-      <button type="submit" id="submit-btn" disabled>Ajouter au Pokédex</button>
+      <button type="submit" id="submit-btn">Ajouter au Pokédex</button>
     </form>
   </div>
 
@@ -77,7 +79,6 @@
   </div>
 
   <script>
-    // Configuration de la progression (identique à la version précédente)
     const levels = [
       { xp: 0, level: 1, title: 'Débutant' },
       { xp: 150, level: 2, title: 'Observateur' },
@@ -91,16 +92,7 @@
 
     let state = JSON.parse(localStorage.getItem('pokedex')) || { xp: 0, animals: [] };
 
-    // Grille XP par rareté (simplifiée temporairement pour l'intégration de base)
-    const rarities = {
-      'Common': { xp: 50, text: 'Commun' },
-      'Uncommon': { xp: 150, text: 'Peu commun' },
-      'Rare': { xp: 350, text: 'Rare' },
-      'Very-rare': { xp: 700, text: 'Très rare' }
-    };
-
     function updateUI() {
-      // (Code de mise à jour UI identique pour XP et Collection)
       let currentLevel = levels[0];
       let nextLevel = levels[1];
       for (let i = levels.length - 1; i >= 0; i--) {
@@ -114,23 +106,31 @@
         progress = Math.min(((state.xp - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100, 100);
       }
       document.getElementById('xp-fill').style.width = progress + '%';
+
       const container = document.getElementById('collection');
       container.innerHTML = '';
       state.animals.forEach(item => {
-        container.innerHTML += `<div class="animal-card"><img src="${item.img}" alt="${item.name}"><h4 style="margin: 5px 0 2px 0;">${item.name}</h4><span class="badge ${item.rarityText.replace(' ', '-')}">${rarities[item.rarityText].text}</span></div>`;
+        const rarityClass = item.rarityText.replace(/\s+/g, '-');
+        container.innerHTML += `
+          <div class="animal-card">
+            <img src="${item.img}" alt="${item.name}">
+            <h4 style="margin: 5px 0 2px 0;">${item.name}</h4>
+            <span class="badge ${rarityClass}">${item.rarityText}</span>
+          </div>
+        `;
       });
       localStorage.setItem('pokedex', JSON.stringify(state));
     }
 
-    // Gestion de l'image et aperçu
     const photoInput = document.getElementById('photo');
     const preview = document.getElementById('preview');
     const analyzeBtn = document.getElementById('analyze-btn');
     let currentPhotoBase64 = null;
+    let currentFile = null;
 
     photoInput.addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
+      currentFile = e.target.files[0];
+      if (currentFile) {
         const reader = new FileReader();
         reader.onload = function(evt) {
           preview.src = evt.target.result;
@@ -140,13 +140,13 @@
           document.getElementById('identification-results').style.display = 'none';
           document.getElementById('capture-form').style.display = 'none';
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(currentFile);
       }
     });
 
-    // --- Appel API iNaturalist ---
+    // Envoi réel à l'API iNaturalist v1
     analyzeBtn.addEventListener('click', async function() {
-      if (!currentPhotoBase64) return;
+      if (!currentFile) return;
       
       const resultsDiv = document.getElementById('identification-results');
       const loading = document.getElementById('loading-ia');
@@ -158,85 +158,75 @@
       analyzeBtn.disabled = true;
       analyzeBtn.textContent = 'Analyse en cours...';
 
+      const formData = new FormData();
+      formData.append('image', currentFile);
+
       try {
-        // iNaturalist Computer Vision API
-        // Nous envoyons l'image encodée directement.
-        const response = await fetch('https://api.inaturalist.org/v2/computervision/score', {
+        const response = await fetch('https://api.inaturalist.org/v1/computervision/score', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            "image_url": currentPhotoBase64.split(',')[1] // Juste la partie base64
-          })
+          body: formData
         });
 
         const data = await response.json();
-        
         loading.style.display = 'none';
+
         if (data.results && data.results.length > 0) {
-          // Afficher les 3 meilleures suggestions
-          data.results.slice(0, 3).forEach(res => {
+          data.results.slice(0, 4).forEach(res => {
             const species = res.taxon;
-            const commonName = species.preferred_common_name || species.name; // Utilise le nom commun ou le nom latin
+            const commonName = species.preferred_common_name || species.name;
             const sciName = species.name;
-            const score = Math.round(res.score);
             const photoUrl = species.default_photo ? species.default_photo.square_url : '';
 
-            list.innerHTML += `
-              <div class="suggestion-item" onclick="selectSpecies('${commonName}', '${sciName}')">
-                <div style="display:flex; align-items:center;">
-                  ${photoUrl ? `<img src="${photoUrl}" style="width:40px;height:40px;border-radius:50%;margin-right:10px;">` : ''}
-                  <div>
-                    <div style="font-weight:bold;">${commonName}</div>
-                    <div style="font-size:12px; font-style:italic;">${sciName}</div>
-                  </div>
+            const item = document.createElement('div');
+            item.className = 'suggestion-item';
+            item.innerHTML = `
+              <div style="display:flex; align-items:center;">
+                ${photoUrl ? `<img src="${photoUrl}" style="width:40px;height:40px;border-radius:50%;margin-right:10px;object-fit:cover;">` : ''}
+                <div>
+                  <div style="font-weight:bold;">${commonName}</div>
+                  <div style="font-size:12px; font-style:italic; color:#666;">${sciName}</div>
                 </div>
               </div>
             `;
+            item.onclick = function() {
+              selectSpecies(commonName);
+            };
+            list.appendChild(item);
           });
         } else {
-          list.innerHTML = '<p>Aucune espèce identifiée. Essayez une autre photo.</p>';
+          list.innerHTML = '<p>Aucune espèce reconnue. Vous pouvez écrire le nom manuellement.</p>';
+          selectSpecies('');
         }
       } catch (error) {
-        console.error('Erreur API iNaturalist:', error);
-        list.innerHTML = '<p>Erreur technique. Vérifiez votre connexion.</p>';
+        console.error('Erreur API:', error);
+        loading.style.display = 'none';
+        list.innerHTML = '<p>Recherche indisponible. Vous pouvez saisir le nom à la main.</p>';
+        selectSpecies('');
       } finally {
         analyzeBtn.disabled = false;
         analyzeBtn.textContent = 'Analyser avec l\'IA';
       }
     });
 
-    // Sélection de l'espèce proposée
-    function selectSpecies(commonName, sciName) {
-      document.querySelectorAll('.suggestion-item').forEach(item => item.classList.remove('selected'));
-      // Ajouter une classe pour visuellement marquer la sélection (simple simulation pour le JS inclus)
-      // Normalement, ceci est géré par l'événement click dans le HTML généré.
-
-      document.getElementById('name').value = commonName;
-      // Simulation Rareté (IA basique) : Nous utiliserons Common pour l'instant
-      // Pour l'intégration, nous devons calculer la rareté plus tard.
-      document.getElementById('rarity-value').value = 'Common';
-      document.getElementById('rarity-display').value = 'Commun (détection IA basique)';
-
+    function selectSpecies(name) {
+      document.getElementById('name').value = name;
       document.getElementById('capture-form').style.display = 'block';
-      document.getElementById('submit-btn').disabled = false;
     }
 
-    // --- Formulaire Final ---
     document.getElementById('capture-form').addEventListener('submit', function(e) {
       e.preventDefault();
       const name = document.getElementById('name').value.trim();
-      const rarityKey = document.getElementById('rarity-value').value;
+      const raritySelect = document.getElementById('rarity');
+      const xpGained = parseInt(raritySelect.value);
+      const rarityText = raritySelect.options[raritySelect.selectedIndex].text.split(' ')[0];
 
-      if (!rarityKey || !rarities[rarityKey]) return;
-
-      const xpGained = rarities[rarityKey].xp;
       const isFirstDiscovery = !state.animals.some(a => a.name.toLowerCase() === name.toLowerCase());
 
       state.xp += xpGained + (isFirstDiscovery ? 50 : 0);
       state.animals.unshift({
         name: name,
         img: currentPhotoBase64,
-        rarityText: rarityKey // Stockage de la clé (Common, Rare, etc.)
+        rarityText: rarityText
       });
       
       updateUI();
@@ -244,7 +234,7 @@
       document.getElementById('preview').style.display = 'none';
       document.getElementById('analyze-btn').style.display = 'none';
       document.getElementById('identification-results').style.display = 'none';
-      photoInput.value = ''; // Reset input file
+      photoInput.value = '';
     });
 
     updateUI();
